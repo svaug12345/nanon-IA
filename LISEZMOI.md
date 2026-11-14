@@ -1,4 +1,4 @@
-# L'Atelier de Nanon — v1.2.0
+# Nanon Claude IA — v1.3.0
 
 Une appli web pour Nanon (Devoirs, Photo d'exercice, Quiz de révision, Discussion) qui utilise les crédits API Claude inclus dans ton abonnement Max.
 

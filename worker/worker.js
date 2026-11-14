@@ -1,5 +1,5 @@
 // =====================================================================
-//  L'Atelier de Nanon — serveur relais (Cloudflare Worker)   v1.0.0
+//  Nanon Claude IA — serveur relais (Cloudflare Worker)
 // ---------------------------------------------------------------------
 //  Pourquoi ce relais ? La page web est publique : si la clé API y était,
 //  n'importe qui pourrait la lire (clic droit > code source) et vider
@@ -17,7 +17,11 @@
 //   - APP_PASSWORD      : le mot de passe que tu donnes à Nanon (« Secret »)
 // =====================================================================
 
-const VERSION = "1.2.0"; // 1.1.0 : mode « créer » ; 1.2.0 : défis + mode « coach » (relecture de son code)
+const VERSION = "1.3.0"; // 1.1.0 : « créer » ; 1.2.0 : défis + « coach » ; 1.3.0 : réponses en direct (streaming)
+
+// Modes qui peuvent répondre « en direct » (mot à mot). Les autres (quiz, créer, coach)
+// ont besoin de la réponse complète pour être découpée, donc pas de streaming.
+const MODES_EN_DIRECT = ["devoirs", "photo", "discussion"];
 
 // Seuls ces sites ont le droit d'appeler le relais.
 const ORIGINES_AUTORISEES = ["https://baiji.fr", "https://www.baiji.fr"];
@@ -193,7 +197,7 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
 
     // Petite page de test si on ouvre l'adresse du relais dans un navigateur.
-    if (request.method === "GET") return json({ ok: true, appli: "Atelier de Nanon", version: VERSION }, 200, cors);
+    if (request.method === "GET") return json({ ok: true, appli: "Nanon Claude IA", version: VERSION }, 200, cors);
 
     if (request.method !== "POST") return json({ erreur: "Méthode non autorisée" }, 405, cors);
 
@@ -216,6 +220,8 @@ export default {
       return json({ erreur: "Requête illisible" }, 400, cors);
     }
     const { mode, messages } = corps || {};
+    // La page demande le direct ; on ne l'accepte que pour les modes prévus.
+    const enDirect = corps?.stream === true && MODES_EN_DIRECT.includes(mode);
 
     // 3. Vérifications du contenu
     if (!MODELES[mode]) return json({ erreur: "Mode inconnu" }, 400, cors);
@@ -241,8 +247,16 @@ export default {
           max_tokens: MAX_TOKENS[mode],
           system: CONSIGNES_COMMUNES + CONSIGNES_MODE[mode], // imposé ici, jamais par la page
           messages: propres,
+          stream: enDirect,               // true = l'API envoie la réponse morceau par morceau
         }),
       });
+      // En direct et sans erreur : on fait passer le flux tel quel jusqu'au téléphone.
+      if (enDirect && reponse.ok) {
+        return new Response(reponse.body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache", ...cors },
+        });
+      }
       donnees = await reponse.json();
     } catch {
       return json({ erreur: "Impossible de joindre Claude, réessaie dans un instant." }, 502, cors);

@@ -1,6 +1,6 @@
 {
-  "name": "L'Atelier de Nanon",
-  "short_name": "Atelier",
+  "name": "Nanon Claude IA",
+  "short_name": "Nanon IA",
   "description": "Devoirs, photos d'exercices, quiz de révision et discussion",
   "start_url": "./",
   "scope": "./",

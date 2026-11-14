@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>L'Atelier de Nanon</title>
+<title>Nanon Claude IA</title>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
@@ -121,6 +121,30 @@
   .defi.reussi { background:#dcfce7; color:#14532d; border-color:#86efac; }
   .ligne-btn .btn-icone { flex:1; padding:10px; }
   details.carte summary { font-weight:700; cursor:pointer; }
+
+  /* ===== v1.3.0 : tiroir des conversations ===== */
+  #voile { position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:30; display:none; }
+  #tiroir { position:fixed; top:0; bottom:0; left:0; width:min(86vw, 360px); background:var(--carte); z-index:31;
+    transform:translateX(-105%); transition:transform .25s ease; display:flex; flex-direction:column; gap:10px;
+    padding:calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)); box-shadow:4px 0 20px rgba(0,0,0,.2); }
+  #tiroir.ouvert { transform:none; }
+  #tiroir > .gros-btn { flex:none; }
+  .tiroir-tete { display:flex; align-items:center; gap:10px; }
+  #recherche { font:inherit; padding:10px 12px; border-radius:12px; border:1px solid var(--bord); background:var(--fond); color:var(--texte); }
+  #liste-conv { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:2px; }
+  .groupe-date { font-size:12px; color:var(--doux); margin:10px 4px 2px; font-weight:600; }
+  .conv { display:flex; align-items:center; gap:6px; padding:8px 8px; border-radius:10px; cursor:pointer; }
+  .conv.active { background:var(--accent-clair); }
+  .conv span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; }
+  .conv button { border:none; background:none; font-size:14px; padding:4px 6px; cursor:pointer; color:var(--doux); }
+  .reglages { border-top:1px solid var(--bord); padding-top:8px; font-size:14px; }
+  .reglages summary { cursor:pointer; font-weight:600; }
+  .reglages .ligne-btn .btn-icone { font-size:13px; }
+
+  /* ===== v1.3.0 : actions sous les réponses (🔊 lire, 📋 copier) ===== */
+  .actions { display:flex; gap:4px; margin-top:6px; }
+  .actions button { border:none; background:var(--accent-clair); color:var(--accent); border-radius:8px; padding:3px 8px; font-size:13px; cursor:pointer; }
+  #btn-envoyer.stop { background:var(--ko); }
 </style>
 </head>
 <body>
@@ -128,18 +152,37 @@
 <!-- Écran du mot de passe (affiché seulement la première fois) -->
 <div id="ecran-mdp">
   <img src="icon-192.png" alt="" width="72" height="72" style="border-radius:18px">
-  <h2 style="margin:0">L'Atelier de Nanon</h2>
+  <h2 style="margin:0">Nanon Claude IA</h2>
   <input id="champ-mdp" type="password" placeholder="Mot de passe" autocomplete="current-password">
   <button class="gros-btn" style="max-width:300px;width:100%" onclick="validerMdp()">Entrer</button>
 </div>
 
 <header>
+  <button class="btn-icone" onclick="ouvrirTiroir(true)" title="Mes conversations">☰</button>
   <h1 id="titre">📚 Devoirs</h1>
   <small id="version"></small>
   <button class="btn-icone" onclick="nouvelleConversation()" title="Nouvelle conversation">＋ Nouveau</button>
 </header>
 
 <main id="zone"></main>
+
+<!-- v1.3.0 : tiroir « Mes conversations » + réglages (s'ouvre avec ☰) -->
+<div id="voile" onclick="ouvrirTiroir(false)"></div>
+<aside id="tiroir">
+  <div class="tiroir-tete">
+    <img src="icon-192.png" alt="" width="32" height="32" style="border-radius:8px">
+    <b style="flex:1">Nanon Claude IA</b>
+    <button class="btn-icone" onclick="ouvrirTiroir(false)">✕</button>
+  </div>
+  <button class="gros-btn" onclick="nouvelleDepuisTiroir()">＋ Nouvelle conversation</button>
+  <input id="recherche" type="search" placeholder="🔍 Rechercher dans mes conversations…" oninput="afficherTiroir()">
+  <div id="liste-conv"></div>
+  <details class="reglages">
+    <summary>⚙️ Réglages</summary>
+    <div id="zone-reglages"></div>
+  </details>
+</aside>
+<input type="file" id="fichier-restaurer" accept="application/json,.json" class="cache">
 
 <!-- Aperçu de la photo choisie, avant envoi -->
 <div class="apercu" id="apercu"><img id="apercu-img" alt=""><span>Photo prête</span>
@@ -166,11 +209,11 @@
 
 <script>
 // =====================================================================
-//  L'Atelier de Nanon — page web   (le numéro de version est ici)
+//  Nanon Claude IA — page web   (le numéro de version est ici)
 // =====================================================================
-const VERSION = "1.2.1"; // 1.1.0 : onglet Créer + missions ; 1.2.0 : défis, coach, carnet ; 1.2.1 : relais Cloudflare branché
+const VERSION = "1.3.0"; // 1.2.x : Créer, défis, coach, relais ; 1.3.0 : nouveau nom, historique, réponses en direct, 🔊, réglages
 
-// ⚠️ À REMPLACER par l'adresse de ton Worker Cloudflare (voir LISEZMOI).
+// Adresse du relais Cloudflare (le Worker qui garde la clé API).
 const RELAIS = "https://atelier-nanon.sebastien-vaug.workers.dev";
 
 // Combien de messages on renvoie à Claude à chaque fois.
@@ -189,8 +232,12 @@ const MODES = {
 // ----- État de l'appli -----
 let mode = "devoirs";
 let photoEnAttente = null;       // { media_type, data } de la photo choisie, pas encore envoyée
-const historiques = {};          // conversations en mémoire, par mode (avec les photos)
+const historiques = {};          // conversation OUVERTE de chaque onglet, en mémoire (avec les photos)
+const convId = {};               // id de la conversation ouverte dans chaque onglet (null = nouvelle)
+let conversations = [];          // toutes les conversations enregistrées : [{ id, mode, titre, messages, date }]
 let enCours = false;             // empêche d'envoyer deux fois pendant qu'on attend
+let controleur = null;           // permet d'arrêter une réponse en cours (bouton ■)
+const MODES_CHAT = ["devoirs", "photo", "discussion"];   // les onglets qui ont un historique
 
 // Raccourci pour récupérer un élément de la page.
 const $ = (id) => document.getElementById(id);
@@ -206,14 +253,42 @@ function ecrireStockage(cle, valeur) {
   try { localStorage.setItem(cle, JSON.stringify(valeur)); } catch { /* stockage plein ou bloqué : pas grave */ }
 }
 
-// On sauvegarde SANS les photos (trop lourdes) : elles sont remplacées par un petit texte.
-function sauvegarder(m) {
-  const allege = (historiques[m] || []).map((msg) => ({
+// Version « allégée » d'une conversation : les photos (trop lourdes pour le stockage
+// du téléphone) sont remplacées par un petit texte.
+function alleger(hist) {
+  return hist.map((msg) => ({
     role: msg.role,
     content: typeof msg.content === "string" ? msg.content
       : msg.content.map((b) => b.type === "image" ? { type: "text", text: "[photo envoyée]" } : b),
   }));
-  ecrireStockage("atelier_" + m, allege.slice(-40));
+}
+
+// Titre automatique = le début du premier message de Nanon (comme ChatGPT ou Claude).
+function titreAuto(hist) {
+  const premier = hist.find((m) => m.role === "user");
+  const blocs = !premier ? [] : typeof premier.content === "string" ? [{ type: "text", text: premier.content }] : premier.content;
+  const texte = (blocs.find((b) => b.type === "text")?.text || "").replace(/\s+/g, " ").trim();
+  const aPhoto = blocs.some((b) => b.type === "image");
+  if (!texte || texte === "Peux-tu m'aider avec cet exercice ?") return aPhoto ? "📷 Photo d'exercice" : "Conversation";
+  return texte.length > 45 ? texte.slice(0, 45) + "…" : texte;
+}
+
+// Enregistre la conversation ouverte de l'onglet m dans la liste « Mes conversations ».
+function sauvegarder(m) {
+  const hist = historiques[m] || [];
+  if (!hist.length) return;
+  let c = conversations.find((x) => x.id === convId[m]);
+  if (!c) {                                   // première réponse : on crée l'entrée
+    c = { id: Date.now(), mode: m, titre: titreAuto(hist) };
+    conversations.push(c);
+    convId[m] = c.id;
+  }
+  c.messages = alleger(hist).slice(-60);       // 60 messages max par conversation
+  c.date = Date.now();
+  // Les plus récentes d'abord, 150 conversations max (le stockage du téléphone est limité).
+  conversations = conversations.sort((a, b) => b.date - a.date).slice(0, 150);
+  ecrireStockage("atelier_convs", conversations);
+  ecrireStockage("atelier_ouvertes", convId);
 }
 
 // ---------------------------------------------------------------------
@@ -242,7 +317,74 @@ async function appelerClaude(modeAppel, messages) {
     $("ecran-mdp").style.display = "flex";
   }
   if (!rep.ok) throw new Error(donnees.erreur || "Erreur " + rep.status);
+  compterTokens(donnees.usage);
   return donnees.texte;
+}
+
+// ---------------------------------------------------------------------
+//  v1.3.0 : appel « en direct » (streaming). La réponse s'affiche mot à mot,
+//  comme sur claude.ai, au lieu d'attendre la fin. Le relais renvoie un flux
+//  « Server-Sent Events » : des lignes « data: {...} » qu'on lit au fur et à mesure.
+// ---------------------------------------------------------------------
+async function appelerClaudeEnDirect(modeAppel, messages, surTexte, signal) {
+  const rep = await fetch(RELAIS, {
+    method: "POST", signal,
+    headers: { "Content-Type": "application/json", "X-App-Password": motDePasse() },
+    body: JSON.stringify({ mode: modeAppel, messages, stream: true }),
+  });
+  const type = rep.headers.get("Content-Type") || "";
+
+  // Réponse classique (erreur, ou ancien relais qui ne sait pas streamer) : on la traite d'un bloc.
+  if (!type.includes("event-stream")) {
+    const donnees = await rep.json().catch(() => ({}));
+    if (rep.status === 401) { ecrireStockage("atelier_mdp", ""); $("ecran-mdp").style.display = "flex"; }
+    if (!rep.ok) throw new Error(donnees.erreur || "Erreur " + rep.status);
+    compterTokens(donnees.usage);
+    surTexte(donnees.texte);
+    return donnees.texte;
+  }
+
+  // Lecture du flux morceau par morceau.
+  const lecteur = rep.body.getReader();
+  const decodeur = new TextDecoder();
+  let tampon = "", texte = "";
+  const usage = { input_tokens: 0, output_tokens: 0 };
+  for (;;) {
+    const { value, done } = await lecteur.read();
+    if (done) break;
+    tampon += decodeur.decode(value, { stream: true });
+    const lignes = tampon.split("\n");
+    tampon = lignes.pop();                      // la dernière ligne peut être incomplète : on la garde
+    for (const ligne of lignes) {
+      if (!ligne.startsWith("data:")) continue;
+      let ev; try { ev = JSON.parse(ligne.slice(5)); } catch { continue; }
+      if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
+        texte += ev.delta.text; surTexte(texte);
+      } else if (ev.type === "message_start") {
+        usage.input_tokens = ev.message?.usage?.input_tokens || 0;
+      } else if (ev.type === "message_delta") {
+        usage.output_tokens = ev.usage?.output_tokens || 0;
+      } else if (ev.type === "error") {
+        throw new Error(ev.error?.message || "Erreur pendant la réponse");
+      }
+    }
+  }
+  compterTokens(usage);
+  return texte;
+}
+
+// ---------------------------------------------------------------------
+//  v1.3.0 : compteur de tokens du mois (pour comprendre ce que « coûte » l'IA)
+// ---------------------------------------------------------------------
+function compterTokens(usage) {
+  if (!usage) return;
+  const mois = new Date().toISOString().slice(0, 7);          // ex. « 2026-11 »
+  let t = lireStockage("atelier_tokens", null);
+  if (!t || t.mois !== mois) t = { mois, entree: 0, sortie: 0, questions: 0 };  // nouveau mois : remise à zéro
+  t.entree += usage.input_tokens || 0;
+  t.sortie += usage.output_tokens || 0;
+  t.questions += 1;
+  ecrireStockage("atelier_tokens", t);
 }
 
 // Prépare la conversation à envoyer : les N derniers messages, en commençant par
@@ -353,19 +495,23 @@ function afficherChat() {
     zone.innerHTML = `<div class="accueil"><b>Salut Nanon 👋</b>${MODES[mode].accueil}</div>`;
     return;
   }
-  zone.innerHTML = hist.map((m) => {
+  zone.innerHTML = hist.map((m, i) => {
     const blocs = typeof m.content === "string" ? [{ type: "text", text: m.content }] : m.content;
     const html = blocs.map((b) => b.type === "image"
       ? `<img src="data:${b.source.media_type};base64,${b.source.data}" alt="photo">`
       : (m.role === "user" ? "<p>" + echapper(b.text).replace(/\n/g, "<br>") + "</p>" : miseEnForme(b.text))
     ).join("");
-    return `<div class="bulle ${m.role === "user" ? "moi" : "elle"}">${html}</div>`;
+    // Sous chaque réponse de l'IA : 🔊 lire à voix haute, 📋 copier.
+    const actions = m.role === "assistant"
+      ? `<div class="actions"><button onclick="lireAVoixHaute(${i}, this)">🔊</button><button onclick="copierMessage(${i}, this)">📋</button></div>` : "";
+    return `<div class="bulle ${m.role === "user" ? "moi" : "elle"}">${html}${actions}</div>`;
   }).join("");
   zone.scrollTop = zone.scrollHeight;
 }
 
 async function envoyer() {
   if (mode === "creer") return envoyerCreation();   // l'onglet Créer a sa propre logique
+  if (controleur) { controleur.abort(); return; }    // pendant une réponse, le bouton devient « ■ Stop »
   if (enCours) return;
   const texte = $("texte").value.trim();
   if (!texte && !photoEnAttente) return;
@@ -382,22 +528,56 @@ async function envoyer() {
   afficherChat();
   attente(true);
 
+  // Bulle qui se remplit au fur et à mesure que la réponse arrive.
+  let bulle = null, partiel = "", dessinPrevu = false, fini = false;
+  const afficherPartiel = (t) => {
+    partiel = t;
+    if (mode !== modeEnvoi || dessinPrevu) return;
+    dessinPrevu = true;
+    // requestAnimationFrame : on redessine au plus 60 fois par seconde, pas à chaque mot.
+    requestAnimationFrame(() => {
+      dessinPrevu = false;
+      if (fini) return;                 // la réponse est terminée : l'affichage final a pris le relais
+      if (!bulle) { attente(false, true); bulle = document.createElement("div"); bulle.className = "bulle elle"; $("zone").appendChild(bulle); }
+      bulle.innerHTML = miseEnForme(partiel);
+      $("zone").scrollTop = $("zone").scrollHeight;
+    });
+  };
+
+  controleur = new AbortController();
+  boutonStop(true);
   try {
-    const reponse = await appelerClaude(modeEnvoi, preparerEnvoi(hist));
-    hist.push({ role: "assistant", content: reponse });
+    const reponse = await appelerClaudeEnDirect(modeEnvoi, preparerEnvoi(hist), afficherPartiel, controleur.signal);
+    hist.push({ role: "assistant", content: reponse || "…" });
   } catch (err) {
-    hist.pop();                          // on retire le message non traité…
-    $("texte").value = texte;            // …et on lui rend son texte pour réessayer
-    alerteDouce(err.message);
+    if (err.name === "AbortError" && partiel) {
+      hist.push({ role: "assistant", content: partiel + "\n\n*(réponse arrêtée)*" });   // on garde le début
+    } else {
+      hist.pop();                          // on retire le message non traité…
+      $("texte").value = texte;            // …et on lui rend son texte pour réessayer
+      if (err.name !== "AbortError") alerteDouce(err.message);
+    }
   }
+  fini = true;
+  controleur = null;
+  boutonStop(false);
   attente(false);
   sauvegarder(modeEnvoi);
   if (mode === modeEnvoi) afficherChat();
 }
 
-function attente(oui) {
-  enCours = oui;
-  $("btn-envoyer").disabled = oui;
+// Le bouton ➤ devient ■ pendant une réponse, pour pouvoir l'arrêter.
+function boutonStop(oui) {
+  const b = $("btn-envoyer");
+  b.textContent = oui ? "■" : "➤";
+  b.classList.toggle("stop", oui);
+  if (oui) b.disabled = false;          // le bouton Stop doit rester cliquable
+  b.title = oui ? "Arrêter la réponse" : "Envoyer";
+}
+
+function attente(oui, garderEtat) {
+  if (!garderEtat) enCours = oui;          // garderEtat : on retire juste « Je réfléchis… »
+  $("btn-envoyer").disabled = oui && !controleur;
   const ancien = document.querySelector(".attente");
   if (ancien) ancien.remove();
   if (oui) {
@@ -418,17 +598,187 @@ function alerteDouce(msg) {
 function nouvelleConversation() {
   if (mode === "quiz") { quizActuel = null; ecrireStockage("atelier_quiz", null); afficherQuiz(); return; }
   if (mode === "creer") { projetCourant = null; afficherCreer(); return; }   // retour à l'écran des idées
-  if (historiques[mode].length && !confirmerEffacement()) return;
-  historiques[mode] = []; sauvegarder(mode); afficherChat();
+  if (!MODES_CHAT.includes(mode)) changerMode("discussion");
+  // Plus besoin de confirmer : l'ancienne conversation reste dans « Mes conversations ».
+  historiques[mode] = []; convId[mode] = null;
+  ecrireStockage("atelier_ouvertes", convId);
+  afficherChat(); $("texte").focus();
 }
-// Petite confirmation sans boîte de dialogue bloquante : deux appuis rapides.
-let dernierAppui = 0;
-function confirmerEffacement() {
-  const maintenant = Date.now();
-  if (maintenant - dernierAppui < 2500) return true;
-  dernierAppui = maintenant;
-  alerteDouce("Appuie encore sur « ＋ Nouveau » pour effacer cette conversation.");
-  return false;
+
+// =====================================================================
+//  v1.3.0 : « Mes conversations » (tiroir ☰), comme sur claude.ai
+// =====================================================================
+const ICONES = { devoirs: "📚", photo: "📷", discussion: "💬" };
+
+function ouvrirTiroir(oui) {
+  if (oui) { afficherTiroir(); afficherReglages(); }
+  $("tiroir").classList.toggle("ouvert", oui);
+  $("voile").style.display = oui ? "block" : "none";
+}
+
+// Depuis le tiroir : nouvelle discussion (sans toucher au quiz ni aux créations).
+function nouvelleDepuisTiroir() {
+  if (!MODES_CHAT.includes(mode)) changerMode("discussion");
+  nouvelleConversation();
+  ouvrirTiroir(false);
+}
+
+// Groupe une date : Aujourd'hui / Hier / 7 derniers jours / mois.
+function groupeDate(ts) {
+  const jour = (d) => new Date(d).setHours(0, 0, 0, 0);
+  const ecart = (jour(Date.now()) - jour(ts)) / 86400000;
+  if (ecart < 1) return "Aujourd'hui";
+  if (ecart < 2) return "Hier";
+  if (ecart < 7) return "7 derniers jours";
+  return new Date(ts).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+}
+
+// Texte brut d'une conversation (pour la recherche).
+function texteConv(c) {
+  return c.titre + " " + c.messages.map((m) => typeof m.content === "string" ? m.content
+    : m.content.filter((b) => b.type === "text").map((b) => b.text).join(" ")).join(" ");
+}
+
+function afficherTiroir() {
+  const q = $("recherche").value.trim().toLowerCase();
+  const liste = conversations.filter((c) => !q || texteConv(c).toLowerCase().includes(q));
+  if (!liste.length) {
+    $("liste-conv").innerHTML = `<div class="mini" style="color:var(--doux);padding:10px">${q ? "Aucun résultat." : "Tes conversations apparaîtront ici."}</div>`;
+    return;
+  }
+  let html = "", groupe = "";
+  for (const c of liste) {
+    const g = groupeDate(c.date);
+    if (g !== groupe) { html += `<div class="groupe-date">${g}</div>`; groupe = g; }
+    const active = convId[c.mode] === c.id && mode === c.mode ? "active" : "";
+    html += `<div class="conv ${active}" onclick="ouvrirConversation(${c.id})">
+      <span>${ICONES[c.mode] || "💬"} ${echapper(c.titre)}</span>
+      <button onclick="event.stopPropagation(); renommerConversation(${c.id})" title="Renommer">✏️</button>
+      <button onclick="event.stopPropagation(); supprimerConversation(${c.id}, this)" title="Supprimer">🗑</button>
+    </div>`;
+  }
+  $("liste-conv").innerHTML = html;
+}
+
+function ouvrirConversation(id) {
+  const c = conversations.find((x) => x.id === id);
+  if (!c) return;
+  changerMode(c.mode);
+  convId[c.mode] = c.id;
+  // On repart d'une copie (sans les photos, qui ne sont pas gardées) : on peut continuer à discuter.
+  historiques[c.mode] = JSON.parse(JSON.stringify(c.messages));
+  ecrireStockage("atelier_ouvertes", convId);
+  afficherChat();
+  ouvrirTiroir(false);
+}
+
+function renommerConversation(id) {
+  const c = conversations.find((x) => x.id === id);
+  const nom = prompt("Nouveau nom de la conversation :", c.titre);
+  if (!nom || !nom.trim()) return;
+  c.titre = nom.trim().slice(0, 60);
+  ecrireStockage("atelier_convs", conversations);
+  afficherTiroir();
+}
+
+function supprimerConversation(id, bouton) {
+  // Double appui pour confirmer (évite les suppressions par erreur).
+  if (bouton.dataset.ok !== "1") { bouton.dataset.ok = "1"; bouton.textContent = "Sûre ?"; return; }
+  conversations = conversations.filter((x) => x.id !== id);
+  ecrireStockage("atelier_convs", conversations);
+  for (const m of MODES_CHAT) if (convId[m] === id) { convId[m] = null; historiques[m] = []; }
+  ecrireStockage("atelier_ouvertes", convId);
+  afficherTiroir();
+  if (MODES_CHAT.includes(mode)) afficherChat();
+}
+
+// =====================================================================
+//  v1.3.0 : 🔊 lire à voix haute, 📋 copier une réponse
+// =====================================================================
+function texteMessage(i) {
+  const m = historiques[mode][i];
+  return typeof m.content === "string" ? m.content : m.content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+}
+
+function lireAVoixHaute(i, bouton) {
+  const synth = window.speechSynthesis;
+  if (!synth) return alerteDouce("La lecture à voix haute n'est pas disponible sur ce téléphone.");
+  if (synth.speaking) { synth.cancel(); bouton.textContent = "🔊"; return; }   // 2e appui = stop
+  // On retire ce qui se lit mal : blocs de code, symboles Markdown.
+  const texte = texteMessage(i)
+    .replace(/```[\s\S]*?```/g, " (bloc de code) ")
+    .replace(/[*#_`>|]/g, "");
+  const voix = new SpeechSynthesisUtterance(texte);
+  voix.lang = "fr-FR";                 // la voix française du téléphone
+  voix.rate = 1.05;
+  voix.onend = () => (bouton.textContent = "🔊");
+  bouton.textContent = "⏹";
+  synth.speak(voix);
+}
+
+function copierMessage(i, bouton) {
+  navigator.clipboard?.writeText(texteMessage(i)).then(
+    () => { bouton.textContent = "✓"; setTimeout(() => (bouton.textContent = "📋"), 1500); },
+    () => { bouton.textContent = "✗"; }
+  );
+}
+
+// =====================================================================
+//  v1.3.0 : ⚙️ Réglages (tokens du mois, sauvegarde, mot de passe)
+// =====================================================================
+function afficherReglages() {
+  const t = lireStockage("atelier_tokens", null);
+  const mois = new Date().toISOString().slice(0, 7);
+  const ok = t && t.mois === mois;
+  const fmt = (n) => (n || 0).toLocaleString("fr-FR");
+  $("zone-reglages").innerHTML = `
+    <p><b>🔢 Ce mois-ci :</b> ${ok ? fmt(t.questions) : 0} questions,
+       ${ok ? fmt(t.entree) : 0} tokens lus, ${ok ? fmt(t.sortie) : 0} tokens écrits.</p>
+    <p class="mini" style="color:var(--doux)">💡 Un « token » est un petit morceau de mot (environ ¾ de mot).
+       L'IA relit toute la conversation à chaque question : c'est pour ça qu'une longue conversation
+       « coûte » plus qu'une nouvelle. Les photos comptent aussi beaucoup.</p>
+    <div class="ligne-btn">
+      <button class="btn-icone" onclick="exporterSauvegarde()">💾 Sauvegarder</button>
+      <button class="btn-icone" onclick="document.getElementById('fichier-restaurer').click()">📂 Restaurer</button>
+    </div>
+    <div class="ligne-btn">
+      <button class="btn-icone" onclick="changerMotDePasse()">🔑 Mot de passe</button>
+    </div>
+    <p class="mini" style="color:var(--doux);text-align:center">Nanon Claude IA · v${VERSION}</p>`;
+}
+
+// Télécharge un fichier avec toutes les données de l'appli (sauf le mot de passe).
+function exporterSauvegarde() {
+  const donnees = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const cle = localStorage.key(i);
+    if (cle.startsWith("atelier_") && cle !== "atelier_mdp") donnees[cle] = localStorage.getItem(cle);
+  }
+  const blob = new Blob([JSON.stringify({ appli: "Nanon Claude IA", version: VERSION, date: new Date().toISOString(), donnees })], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "nanon-claude-ia-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// Restaure un fichier de sauvegarde (remplace les données actuelles), puis recharge l'appli.
+$("fichier-restaurer").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  try {
+    const s = JSON.parse(await f.text());
+    if (!s.donnees) throw new Error();
+    for (const [cle, valeur] of Object.entries(s.donnees)) if (cle.startsWith("atelier_")) localStorage.setItem(cle, valeur);
+    location.reload();
+  } catch { alerteDouce("Ce fichier n'est pas une sauvegarde de Nanon Claude IA."); }
+});
+
+function changerMotDePasse() {
+  ecrireStockage("atelier_mdp", "");
+  ouvrirTiroir(false);
+  $("champ-mdp").value = "";
+  $("ecran-mdp").style.display = "flex";
 }
 
 // ---------------------------------------------------------------------
@@ -830,7 +1180,23 @@ $("texte").addEventListener("input", ajusterHauteur);
 //  Démarrage
 // ---------------------------------------------------------------------
 $("version").textContent = "v" + VERSION;
-for (const m of Object.keys(MODES)) historiques[m] = lireStockage("atelier_" + m, []);
+conversations = lireStockage("atelier_convs", []);
+// Migration depuis la v1.2 : chaque onglet n'avait qu'UNE conversation, rangée sous « atelier_<onglet> ».
+// On la transforme en entrée de « Mes conversations », puis on supprime l'ancienne clé.
+MODES_CHAT.forEach((m, k) => {
+  const ancienne = lireStockage("atelier_" + m, null);
+  if (ancienne && ancienne.length) {
+    conversations.push({ id: Date.now() + k, mode: m, titre: titreAuto(ancienne), messages: ancienne, date: Date.now() - k });
+    ecrireStockage("atelier_convs", conversations);
+  }
+  try { localStorage.removeItem("atelier_" + m); } catch {}
+});
+// On rouvre, dans chaque onglet, la conversation qui était ouverte la dernière fois.
+Object.assign(convId, lireStockage("atelier_ouvertes", {}));
+for (const m of Object.keys(MODES)) {
+  const c = conversations.find((x) => x.id === convId[m]);
+  historiques[m] = c ? JSON.parse(JSON.stringify(c.messages)) : [];
+}
 if (!motDePasse()) $("ecran-mdp").style.display = "flex";
 changerMode(lireStockage("atelier_mode", "devoirs"));
 
