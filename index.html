@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>L'Atelier de Nanon</title>
+<meta name="theme-color" content="#0f766e">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  /* ===== Couleurs de la charte SV (turquoise / bleu-vert) ===== */
+  :root {
+    --fond: #f4f8f8;  --carte: #ffffff;  --texte: #17302e;  --doux: #5b7472;
+    --accent: #0f766e; --accent-clair: #ccebe7; --bulle-moi: #0f766e; --bord: #dbe6e5;
+    --ok: #15803d; --ko: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fond:#0e1716; --carte:#16211f; --texte:#e5efee; --doux:#8fa6a3;
+            --accent:#2dd4bf; --accent-clair:#123a36; --bulle-moi:#0f766e; --bord:#24332f; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--fond); color:var(--texte);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size:16px; }
+  body { display:flex; flex-direction:column; height:100dvh; }
+
+  /* En-tête */
+  header { padding:12px 16px calc(10px) ; padding-top:calc(12px + env(safe-area-inset-top));
+    display:flex; align-items:center; gap:10px; background:var(--carte); border-bottom:1px solid var(--bord); }
+  header h1 { font-size:18px; margin:0; flex:1; }
+  header small { color:var(--doux); font-size:11px; }
+  .btn-icone { border:none; background:var(--accent-clair); color:var(--accent); border-radius:10px;
+    padding:8px 10px; font-size:14px; cursor:pointer; }
+
+  /* Zone principale (chat ou quiz) */
+  main { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .bulle { max-width:88%; padding:10px 14px; border-radius:16px; line-height:1.45; word-wrap:break-word; }
+  .bulle.moi { align-self:flex-end; background:var(--bulle-moi); color:#fff; border-bottom-right-radius:4px; }
+  .bulle.elle { align-self:flex-start; background:var(--carte); border:1px solid var(--bord); border-bottom-left-radius:4px; }
+  .bulle img { max-width:100%; border-radius:10px; display:block; margin-bottom:6px; }
+  .bulle p { margin:0 0 8px; } .bulle p:last-child { margin:0; }
+  .bulle ul { margin:4px 0 8px; padding-left:20px; }
+  .accueil { color:var(--doux); text-align:center; margin:auto 10px; line-height:1.5; }
+  .accueil b { color:var(--texte); font-size:20px; display:block; margin-bottom:6px; }
+  .attente { align-self:flex-start; color:var(--doux); font-style:italic; }
+
+  /* Barre de saisie */
+  .saisie { display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:var(--carte); border-top:1px solid var(--bord); align-items:flex-end; }
+  .saisie textarea { flex:1; resize:none; border:1px solid var(--bord); border-radius:14px; padding:10px 12px;
+    font:inherit; background:var(--fond); color:var(--texte); max-height:120px; }
+  .saisie button { border:none; border-radius:12px; padding:10px 14px; font-size:16px; cursor:pointer;
+    background:var(--accent); color:#fff; }
+  .saisie button.secondaire { background:var(--accent-clair); color:var(--accent); }
+  .apercu { display:none; padding:6px 12px 0; background:var(--carte); align-items:center; gap:8px; font-size:13px; color:var(--doux);}
+  .apercu img { height:48px; border-radius:6px; }
+
+  /* Onglets du bas */
+  nav { display:flex; background:var(--carte); border-top:1px solid var(--bord); padding-bottom:env(safe-area-inset-bottom); }
+  nav button { flex:1; border:none; background:none; padding:8px 0 10px; color:var(--doux); font-size:12px; cursor:pointer; }
+  nav button span { display:block; font-size:22px; }
+  nav button.actif { color:var(--accent); font-weight:600; }
+
+  /* Quiz */
+  .carte { background:var(--carte); border:1px solid var(--bord); border-radius:16px; padding:14px 16px; }
+  .carte h2 { margin:0 0 8px; font-size:18px; }
+  .carte ul { margin:0; padding-left:20px; line-height:1.5; }
+  .choix { display:block; width:100%; text-align:left; margin:6px 0; padding:10px 12px; border-radius:12px;
+    border:1px solid var(--bord); background:var(--fond); color:var(--texte); font:inherit; cursor:pointer; }
+  .choix.bon { border-color:var(--ok); background:#dcfce7; color:#14532d; }
+  .choix.faux { border-color:var(--ko); background:#fee2e2; color:#7f1d1d; }
+  .explication { font-size:14px; color:var(--doux); margin-top:6px; }
+  .zone-quiz textarea { width:100%; min-height:140px; border:1px solid var(--bord); border-radius:12px; padding:10px;
+    font:inherit; background:var(--fond); color:var(--texte); }
+  .ligne-btn { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .gros-btn { flex:1; border:none; border-radius:12px; padding:12px; font:inherit; font-weight:600; cursor:pointer;
+    background:var(--accent); color:#fff; }
+  .gros-btn.secondaire { background:var(--accent-clair); color:var(--accent); }
+
+  /* Écran mot de passe */
+  #ecran-mdp { position:fixed; inset:0; background:var(--fond); display:none; flex-direction:column;
+    align-items:center; justify-content:center; gap:12px; padding:24px; z-index:10; }
+  #ecran-mdp input { font:inherit; padding:12px; border-radius:12px; border:1px solid var(--bord); width:100%; max-width:300px;
+    background:var(--carte); color:var(--texte); }
+  .cache { display:none !important; }
+
+  /* ===== v1.1.0 : blocs de code (tous les onglets) ===== */
+  .code { position:relative; margin:6px 0; }
+  .code pre { margin:0; background:#0e1716; color:#d6f5f0; border-radius:10px; padding:12px; overflow-x:auto;
+    font:12.5px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space:pre; }
+  .code button { position:absolute; top:6px; right:6px; border:none; border-radius:8px; padding:4px 8px;
+    font-size:12px; background:#2dd4bf; color:#0e1716; cursor:pointer; }
+
+  /* ===== v1.1.0 : onglet Créer ===== */
+  .titre-section { font-weight:700; margin:8px 2px 0; }
+  .progression { height:8px; background:var(--accent-clair); border-radius:8px; overflow:hidden; margin-top:8px; }
+  .progression div { height:100%; background:var(--accent); border-radius:8px; transition:width .4s; }
+  .grille { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .mission { background:var(--carte); border:1px solid var(--bord); border-radius:14px; padding:10px; text-align:left;
+    font:inherit; color:var(--texte); cursor:pointer; position:relative; }
+  .mission .emoji { font-size:26px; display:block; }
+  .mission b { display:block; font-size:14px; margin:4px 0 2px; }
+  .mission small { color:var(--doux); font-size:12px; line-height:1.3; display:block; }
+  .mission.faite { border-color:var(--accent); }
+  .mission.faite::after { content:"✅"; position:absolute; top:8px; right:8px; }
+  .projet-ligne { display:flex; align-items:center; gap:8px; background:var(--carte); border:1px solid var(--bord);
+    border-radius:12px; padding:10px 12px; }
+  .projet-ligne span { flex:1; cursor:pointer; }
+  .barre-projet { display:flex; gap:6px; align-items:center; }
+  .barre-projet b { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .apercu-projet { width:100%; height:48vh; border:1px solid var(--bord); border-radius:14px; background:#fff; flex-shrink:0; }
+  .apercu-projet.plein { position:fixed; inset:0; height:100dvh; border-radius:0; z-index:20; border:none; }
+  #fermer-plein { position:fixed; top:calc(10px + env(safe-area-inset-top)); right:10px; z-index:21; display:none; }
+  .astuce { background:var(--accent-clair); border-radius:12px; padding:8px 12px; font-size:14px; }
+  .mini { font-size:14px; }
+
+  /* ===== v1.2.0 : éditeur de code et défis ===== */
+  .editeur { width:100%; min-height:260px; background:#0e1716; color:#d6f5f0; border-radius:12px; border:none; padding:12px;
+    font:12.5px/1.5 ui-monospace, Menlo, Consolas, monospace; white-space:pre; overflow-wrap:normal; overflow-x:auto; tab-size:2; }
+  .defi { background:#fff7e0; color:#5b4300; border:1px solid #f5d77a; border-radius:12px; padding:10px 12px; font-size:14px; }
+  .defi.reussi { background:#dcfce7; color:#14532d; border-color:#86efac; }
+  .ligne-btn .btn-icone { flex:1; padding:10px; }
+  details.carte summary { font-weight:700; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<!-- Écran du mot de passe (affiché seulement la première fois) -->
+<div id="ecran-mdp">
+  <img src="icon-192.png" alt="" width="72" height="72" style="border-radius:18px">
+  <h2 style="margin:0">L'Atelier de Nanon</h2>
+  <input id="champ-mdp" type="password" placeholder="Mot de passe" autocomplete="current-password">
+  <button class="gros-btn" style="max-width:300px;width:100%" onclick="validerMdp()">Entrer</button>
+</div>
+
+<header>
+  <h1 id="titre">📚 Devoirs</h1>
+  <small id="version"></small>
+  <button class="btn-icone" onclick="nouvelleConversation()" title="Nouvelle conversation">＋ Nouveau</button>
+</header>
+
+<main id="zone"></main>
+
+<!-- Aperçu de la photo choisie, avant envoi -->
+<div class="apercu" id="apercu"><img id="apercu-img" alt=""><span>Photo prête</span>
+  <button class="btn-icone" onclick="retirerPhoto()">✕</button></div>
+
+<!-- Barre de saisie (cachée en mode quiz) -->
+<div class="saisie" id="saisie">
+  <button class="secondaire" id="btn-photo" onclick="document.getElementById('fichier').click()" title="Photo">📷</button>
+  <textarea id="texte" rows="1" placeholder="Écris ton message…"></textarea>
+  <button id="btn-envoyer" onclick="envoyer()">➤</button>
+</div>
+<!-- capture="environment" ouvre directement l'appareil photo arrière sur téléphone -->
+<!-- Bouton pour sortir du plein écran d'un projet « Créer » -->
+<button class="btn-icone" id="fermer-plein" onclick="pleinEcran(false)">✕ Fermer</button>
+<input type="file" id="fichier" accept="image/*" capture="environment" class="cache">
+
+<nav>
+  <button data-mode="devoirs"    class="actif"><span>📚</span>Devoirs</button>
+  <button data-mode="photo"><span>📷</span>Photo</button>
+  <button data-mode="quiz"><span>🧠</span>Quiz</button>
+  <button data-mode="creer"><span>🚀</span>Créer</button>
+  <button data-mode="discussion"><span>💬</span>Discussion</button>
+</nav>
+
+<script>
+// =====================================================================
+//  L'Atelier de Nanon — page web   (le numéro de version est ici)
+// =====================================================================
+const VERSION = "1.2.0"; // 1.1.0 : onglet Créer + missions ; 1.2.0 : défis à coder soi-même, coach, carnet
+
+// ⚠️ À REMPLACER par l'adresse de ton Worker Cloudflare (voir LISEZMOI).
+const RELAIS = "https://atelier-nanon.TON-SOUS-DOMAINE.workers.dev";
+
+// Combien de messages on renvoie à Claude à chaque fois.
+// Moins de messages = moins de tokens = crédit qui dure plus longtemps.
+const MESSAGES_MAX = 20;
+
+// Description de chaque onglet.
+const MODES = {
+  devoirs:    { titre: "📚 Devoirs",    accueil: "Dis-moi sur quoi tu bloques. Je ne te donne pas la réponse, mais je t'aide à la trouver 💪", photo: true },
+  photo:      { titre: "📷 Photo",      accueil: "Prends ton exercice en photo avec le bouton 📷, ajoute une question si tu veux, et envoie !", photo: true },
+  quiz:       { titre: "🧠 Révisions",  accueil: "" },
+  creer:      { titre: "🚀 Créer",      accueil: "" },
+  discussion: { titre: "💬 Discussion", accueil: "De quoi tu as envie de parler ?", photo: true },
+};
+
+// ----- État de l'appli -----
+let mode = "devoirs";
+let photoEnAttente = null;       // { media_type, data } de la photo choisie, pas encore envoyée
+const historiques = {};          // conversations en mémoire, par mode (avec les photos)
+let enCours = false;             // empêche d'envoyer deux fois pendant qu'on attend
+
+// Raccourci pour récupérer un élément de la page.
+const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------------
+//  Stockage local (le téléphone garde les conversations entre deux visites)
+//  On entoure de try/catch : le stockage peut être indisponible.
+// ---------------------------------------------------------------------
+function lireStockage(cle, defaut) {
+  try { const v = localStorage.getItem(cle); return v ? JSON.parse(v) : defaut; } catch { return defaut; }
+}
+function ecrireStockage(cle, valeur) {
+  try { localStorage.setItem(cle, JSON.stringify(valeur)); } catch { /* stockage plein ou bloqué : pas grave */ }
+}
+
+// On sauvegarde SANS les photos (trop lourdes) : elles sont remplacées par un petit texte.
+function sauvegarder(m) {
+  const allege = (historiques[m] || []).map((msg) => ({
+    role: msg.role,
+    content: typeof msg.content === "string" ? msg.content
+      : msg.content.map((b) => b.type === "image" ? { type: "text", text: "[photo envoyée]" } : b),
+  }));
+  ecrireStockage("atelier_" + m, allege.slice(-40));
+}
+
+// ---------------------------------------------------------------------
+//  Mot de passe
+// ---------------------------------------------------------------------
+function motDePasse() { return lireStockage("atelier_mdp", ""); }
+function validerMdp() {
+  const v = $("champ-mdp").value.trim();
+  if (!v) return;
+  ecrireStockage("atelier_mdp", v);
+  $("ecran-mdp").style.display = "none";
+}
+
+// ---------------------------------------------------------------------
+//  Appel au relais Cloudflare
+// ---------------------------------------------------------------------
+async function appelerClaude(modeAppel, messages) {
+  const rep = await fetch(RELAIS, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-App-Password": motDePasse() },
+    body: JSON.stringify({ mode: modeAppel, messages }),
+  });
+  const donnees = await rep.json().catch(() => ({}));
+  if (rep.status === 401) {                       // mauvais mot de passe → on le redemande
+    ecrireStockage("atelier_mdp", "");
+    $("ecran-mdp").style.display = "flex";
+  }
+  if (!rep.ok) throw new Error(donnees.erreur || "Erreur " + rep.status);
+  return donnees.texte;
+}
+
+// Prépare la conversation à envoyer : les N derniers messages, en commençant par
+// un message de Nanon, et en ne gardant QUE la photo la plus récente
+// (renvoyer toutes les anciennes photos à chaque fois coûterait cher).
+function preparerEnvoi(hist) {
+  let msgs = hist.slice(-MESSAGES_MAX);
+  while (msgs.length && msgs[0].role !== "user") msgs = msgs.slice(1);
+  let photoGardee = false;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const c = msgs[i].content;
+    if (typeof c === "string") continue;
+    msgs[i] = { role: msgs[i].role, content: c.map((b) => {
+      if (b.type !== "image") return b;
+      if (!photoGardee) { photoGardee = true; return b; }
+      return { type: "text", text: "[photo envoyée plus tôt]" };
+    }) };
+  }
+  return msgs;
+}
+
+// ---------------------------------------------------------------------
+//  Photos : on réduit l'image dans le téléphone avant l'envoi
+//  (1568 px max = la taille utile pour Claude ; au-delà on paie pour rien)
+// ---------------------------------------------------------------------
+function reduirePhoto(fichier) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 1568;
+      const ratio = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * ratio);
+      c.height = Math.round(img.height * ratio);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      const dataUrl = c.toDataURL("image/jpeg", 0.85);
+      URL.revokeObjectURL(img.src);
+      resolve({ media_type: "image/jpeg", data: dataUrl.split(",")[1], apercu: dataUrl });
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(fichier);
+  });
+}
+
+$("fichier").addEventListener("change", async (e) => {
+  const f = e.target.files[0];
+  e.target.value = "";                  // permet de rechoisir la même photo plus tard
+  if (!f) return;
+  photoEnAttente = await reduirePhoto(f);
+  if (mode === "quiz") { lancerQuiz(); return; }   // en mode quiz, la photo lance directement le quiz
+  $("apercu-img").src = photoEnAttente.apercu;
+  $("apercu").style.display = "flex";
+});
+function retirerPhoto() { photoEnAttente = null; $("apercu").style.display = "none"; }
+
+// ---------------------------------------------------------------------
+//  Mise en forme des réponses (mini-Markdown : gras, italique, listes)
+// ---------------------------------------------------------------------
+function echapper(t) {
+  return t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+function miseEnForme(texte) {
+  // 1. On met de côté les blocs de code ```…``` (remplacés par un repère « §CODE0§ »)
+  //    pour que le gras/italique ne les abîme pas. Le (```|$) gère un bloc non refermé.
+  const codes = [];
+  texte = texte.replace(/```[\w-]*\n?([\s\S]*?)(```|$)/g, (_, code) => {
+    codes.push(code.replace(/\n$/, ""));
+    return "\n\n§CODE" + (codes.length - 1) + "§\n\n";
+  });
+
+  // 2. On échappe le HTML (sécurité), puis on applique les styles.
+  const blocs = echapper(texte).split(/\n{2,}/).filter((b) => b.trim());
+  return blocs.map((bloc) => {
+    if (/^§CODE\d+§$/.test(bloc.trim())) return bloc.trim();   // le repère reste seul dans son bloc
+    const lignes = bloc.split("\n");
+    if (lignes.every((l) => /^\s*([-*•]|\d+[.)])\s+/.test(l))) {
+      return "<ul>" + lignes.map((l) => "<li>" + l.replace(/^\s*([-*•]|\d+[.)])\s+/, "") + "</li>").join("") + "</ul>";
+    }
+    // Les titres Markdown (« ## Titre ») deviennent simplement du gras.
+    return "<p>" + lignes.map((l) => l.replace(/^#{1,4}\s*(.+)$/, "**$1**")).join("<br>") + "</p>";
+  }).join("")
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/(^|[^*])\*(?!\s)(.+?)\*/g, "$1<i>$2</i>")
+    // 3. On remet les blocs de code, avec un bouton Copier.
+    .replace(/§CODE(\d+)§/g, (_, i) => blocCode(codes[i]));
+}
+
+// Un bloc de code affiché joliment, avec un bouton « Copier ».
+function blocCode(code) {
+  return `<div class="code"><button onclick="copier(this)">Copier</button><pre><code>${echapper(code)}</code></pre></div>`;
+}
+// Copie le texte du bloc <pre> qui suit le bouton.
+function copier(bouton) {
+  const texte = bouton.nextElementSibling.textContent;
+  navigator.clipboard?.writeText(texte).then(
+    () => { bouton.textContent = "Copié ✓"; setTimeout(() => (bouton.textContent = "Copier"), 1500); },
+    () => { bouton.textContent = "Échec"; }
+  );
+}
+
+// ---------------------------------------------------------------------
+//  Affichage du chat
+// ---------------------------------------------------------------------
+function afficherChat() {
+  const zone = $("zone");
+  const hist = historiques[mode];
+  if (!hist.length) {
+    zone.innerHTML = `<div class="accueil"><b>Salut Nanon 👋</b>${MODES[mode].accueil}</div>`;
+    return;
+  }
+  zone.innerHTML = hist.map((m) => {
+    const blocs = typeof m.content === "string" ? [{ type: "text", text: m.content }] : m.content;
+    const html = blocs.map((b) => b.type === "image"
+      ? `<img src="data:${b.source.media_type};base64,${b.source.data}" alt="photo">`
+      : (m.role === "user" ? "<p>" + echapper(b.text).replace(/\n/g, "<br>") + "</p>" : miseEnForme(b.text))
+    ).join("");
+    return `<div class="bulle ${m.role === "user" ? "moi" : "elle"}">${html}</div>`;
+  }).join("");
+  zone.scrollTop = zone.scrollHeight;
+}
+
+async function envoyer() {
+  if (mode === "creer") return envoyerCreation();   // l'onglet Créer a sa propre logique
+  if (enCours) return;
+  const texte = $("texte").value.trim();
+  if (!texte && !photoEnAttente) return;
+
+  // Construit le message de Nanon : photo éventuelle + texte.
+  const contenu = [];
+  if (photoEnAttente) contenu.push({ type: "image", source: { type: "base64", media_type: photoEnAttente.media_type, data: photoEnAttente.data } });
+  contenu.push({ type: "text", text: texte || "Peux-tu m'aider avec cet exercice ?" });
+
+  const hist = historiques[mode];
+  const modeEnvoi = mode;               // si elle change d'onglet pendant l'attente
+  hist.push({ role: "user", content: contenu });
+  $("texte").value = ""; ajusterHauteur(); retirerPhoto();
+  afficherChat();
+  attente(true);
+
+  try {
+    const reponse = await appelerClaude(modeEnvoi, preparerEnvoi(hist));
+    hist.push({ role: "assistant", content: reponse });
+  } catch (err) {
+    hist.pop();                          // on retire le message non traité…
+    $("texte").value = texte;            // …et on lui rend son texte pour réessayer
+    alerteDouce(err.message);
+  }
+  attente(false);
+  sauvegarder(modeEnvoi);
+  if (mode === modeEnvoi) afficherChat();
+}
+
+function attente(oui) {
+  enCours = oui;
+  $("btn-envoyer").disabled = oui;
+  const ancien = document.querySelector(".attente");
+  if (ancien) ancien.remove();
+  if (oui) {
+    const d = document.createElement("div");
+    d.className = "attente"; d.textContent = "Je réfléchis… 🤔";
+    $("zone").appendChild(d); $("zone").scrollTop = $("zone").scrollHeight;
+  }
+}
+function alerteDouce(msg) {
+  const d = document.createElement("div");
+  d.className = "bulle elle"; d.style.borderColor = "var(--ko)";
+  d.textContent = "😕 " + msg;
+  // Dans l'onglet Créer, le plus récent est en haut : on affiche le message en haut.
+  if (mode === "creer") { $("zone").prepend(d); $("zone").scrollTop = 0; return; }
+  $("zone").appendChild(d); $("zone").scrollTop = $("zone").scrollHeight;
+}
+
+function nouvelleConversation() {
+  if (mode === "quiz") { quizActuel = null; ecrireStockage("atelier_quiz", null); afficherQuiz(); return; }
+  if (mode === "creer") { projetCourant = null; afficherCreer(); return; }   // retour à l'écran des idées
+  if (historiques[mode].length && !confirmerEffacement()) return;
+  historiques[mode] = []; sauvegarder(mode); afficherChat();
+}
+// Petite confirmation sans boîte de dialogue bloquante : deux appuis rapides.
+let dernierAppui = 0;
+function confirmerEffacement() {
+  const maintenant = Date.now();
+  if (maintenant - dernierAppui < 2500) return true;
+  dernierAppui = maintenant;
+  alerteDouce("Appuie encore sur « ＋ Nouveau » pour effacer cette conversation.");
+  return false;
+}
+
+// ---------------------------------------------------------------------
+//  Mode QUIZ : fiche de révision + 8 questions interactives
+// ---------------------------------------------------------------------
+let quizActuel = lireStockage("atelier_quiz", null);   // { titre, fiche, questions, reponses }
+
+function afficherQuiz() {
+  const zone = $("zone");
+  if (!quizActuel) {
+    zone.innerHTML = `
+      <div class="carte zone-quiz">
+        <h2>🧠 Révise une leçon</h2>
+        <p style="margin:0 0 10px;color:var(--doux)">Prends ta leçon en photo ou colle-la ici : je te fais une fiche et un quiz.</p>
+        <textarea id="lecon" placeholder="Colle ta leçon ici…"></textarea>
+        <div class="ligne-btn">
+          <button class="gros-btn secondaire" onclick="document.getElementById('fichier').click()">📷 Photo de la leçon</button>
+          <button class="gros-btn" onclick="lancerQuiz()">Créer le quiz</button>
+        </div>
+      </div>`;
+    return;
+  }
+  const q = quizActuel;
+  const score = q.reponses.filter((r, i) => r === q.questions[i].bonne).length;
+  const finies = q.reponses.filter((r) => r !== null).length;
+  zone.innerHTML = `
+    <div class="carte"><h2>${echapper(q.titre)}</h2>
+      <ul>${q.fiche.map((p) => "<li>" + echapper(p) + "</li>").join("")}</ul></div>
+    ${q.questions.map((qu, i) => `
+      <div class="carte">
+        <b>${i + 1}. ${echapper(qu.question)}</b>
+        ${qu.choix.map((c, j) => {
+          let classe = "";
+          if (q.reponses[i] !== null) classe = j === qu.bonne ? "bon" : (j === q.reponses[i] ? "faux" : "");
+          return `<button class="choix ${classe}" onclick="repondre(${i},${j})">${echapper(c)}</button>`;
+        }).join("")}
+        ${q.reponses[i] !== null ? `<div class="explication">${echapper(qu.explication)}</div>` : ""}
+      </div>`).join("")}
+    <div class="carte" style="text-align:center">
+      <b>Score : ${score} / ${q.questions.length}</b>${finies === q.questions.length ? (score >= 6 ? " 🎉 Bravo !" : " — on recommence ? 💪") : ""}
+      <div class="ligne-btn">
+        <button class="gros-btn secondaire" onclick="recommencerQuiz()">🔁 Refaire</button>
+        <button class="gros-btn" onclick="nouvelleConversation()">Nouvelle leçon</button>
+      </div>
+    </div>`;
+}
+
+function repondre(i, j) {
+  if (quizActuel.reponses[i] !== null) return;     // une seule tentative par question
+  quizActuel.reponses[i] = j;
+  ecrireStockage("atelier_quiz", quizActuel);
+  const y = $("zone").scrollTop; afficherQuiz(); $("zone").scrollTop = y;
+}
+function recommencerQuiz() {
+  quizActuel.reponses = quizActuel.questions.map(() => null);
+  ecrireStockage("atelier_quiz", quizActuel); afficherQuiz(); $("zone").scrollTop = 0;
+}
+
+async function lancerQuiz() {
+  if (enCours) return;
+  const lecon = ($("lecon")?.value || "").trim();
+  if (!lecon && !photoEnAttente) { alerteDouce("Colle une leçon ou prends-la en photo d'abord."); return; }
+  const contenu = [];
+  if (photoEnAttente) contenu.push({ type: "image", source: { type: "base64", media_type: photoEnAttente.media_type, data: photoEnAttente.data } });
+  contenu.push({ type: "text", text: lecon || "Voici ma leçon en photo." });
+  photoEnAttente = null;
+
+  $("zone").innerHTML = `<div class="accueil"><b>⏳</b>Je lis ta leçon et je prépare ton quiz…</div>`;
+  enCours = true;
+  try {
+    const brut = await appelerClaude("quiz", [{ role: "user", content: contenu }]);
+    // Claude doit répondre en JSON : on récupère ce qui est entre la 1re « { » et la dernière « } ».
+    const json = JSON.parse(brut.slice(brut.indexOf("{"), brut.lastIndexOf("}") + 1));
+    if (json.erreur) throw new Error(json.erreur);
+    if (!Array.isArray(json.questions) || !json.questions.length) throw new Error("Quiz incomplet, réessaie.");
+    quizActuel = { titre: json.titre || "Ma leçon", fiche: json.fiche || [], questions: json.questions,
+                   reponses: json.questions.map(() => null) };
+    ecrireStockage("atelier_quiz", quizActuel);
+    afficherQuiz();
+  } catch (err) {
+    afficherQuiz();
+    if ($("lecon")) $("lecon").value = lecon;
+    alerteDouce(err.message.includes("JSON") ? "Je n'ai pas réussi à fabriquer le quiz, réessaie." : err.message);
+  }
+  enCours = false;
+}
+
+// =====================================================================
+//  Onglet CRÉER (v1.1.0) : Nanon décrit une idée, Claude la code,
+//  le résultat s'affiche et se joue tout de suite. Elle l'améliore en discutant.
+// =====================================================================
+
+// Les missions : chacune apprend UNE compétence pour bien utiliser l'IA.
+// mode = onglet où se fait la mission ; demande = texte pré-rempli ; astuce = ce qu'elle apprend.
+const MISSIONS = [
+  { id: "carte", niveau: 1, emoji: "🎉", titre: "Ma carte animée", mode: "creer",
+    demande: "Fais une carte d'anniversaire animée avec des confettis, pour ma meilleure amie qui adore le violet",
+    astuce: "Décris ce que tu veux voir : couleurs, texte, mouvement, pour qui c'est." },
+  { id: "serpent", niveau: 1, emoji: "🐍", titre: "Le jeu du serpent", mode: "creer",
+    demande: "Crée le jeu du serpent, jouable sur téléphone avec des flèches à l'écran, avec un score",
+    astuce: "Dis où ça sera utilisé (téléphone !) : l'IA ne le devine pas." },
+  { id: "role", niveau: 1, emoji: "🎭", titre: "Interview d'une célébrité", mode: "discussion",
+    demande: "Fais comme si tu étais Marie Curie : je suis journaliste et je vais t'interviewer pour mon exposé. Présente-toi en 3 phrases.",
+    astuce: "Donner un rôle à l'IA change complètement sa façon de répondre." },
+  { id: "etoiles", niveau: 2, emoji: "⭐", titre: "Pas à pas", mode: "creer",
+    demande: "Crée un jeu très simple où on attrape des étoiles qui tombent en bougeant un panier avec le doigt",
+    astuce: "Ensuite, demande UNE amélioration à la fois : un score, puis des niveaux, puis un son…" },
+  { id: "explique", niveau: 2, emoji: "🔍", titre: "L'IA prof de code", mode: "creer",
+    demande: "Crée un bouton qui change la couleur du fond au hasard, et explique-moi chaque ligne du code comme à une débutante",
+    astuce: "L'IA peut être ta prof : demande-lui d'expliquer, pas seulement de faire." },
+  { id: "coach", niveau: 2, emoji: "📝", titre: "Le coach de demandes", mode: "discussion",
+    demande: "Je veux demander à une IA « fais-moi un jeu ». Aide-moi à transformer cette demande en une demande beaucoup plus précise.",
+    astuce: "L'IA peut t'aider… à mieux parler à l'IA !" },
+  { id: "piege", niveau: 2, emoji: "🕵️", titre: "Piège l'IA", mode: "discussion",
+    demande: "Quel temps fait-il aujourd'hui à Gif-sur-Yvette, et quelle est la dernière chanson sortie de mon chanteur préféré ?",
+    astuce: "Ici l'IA n'a pas internet : elle peut ne pas savoir, ou se tromper. Vérifie toujours les infos importantes." },
+  { id: "dessin", niveau: 3, emoji: "✏️", titre: "Mon dessin devient un jeu", mode: "creer", photo: true,
+    demande: "Transforme mon dessin (en photo) en petit jeu ou en animation",
+    astuce: "L'IA comprend aussi les images : dessine sur papier, prends en photo (📷), envoie." },
+  { id: "outil", niveau: 3, emoji: "⏱️", titre: "Mon outil perso", mode: "creer",
+    demande: "Crée un minuteur de révision Pomodoro (25 min de travail, 5 min de pause), joli, avec un son à la fin",
+    astuce: "Pense à un petit problème de ta vie : l'IA peut t'aider à fabriquer l'outil qui le règle." },
+  { id: "musique", niveau: 3, emoji: "🥁", titre: "Ma boîte à rythmes", mode: "creer",
+    demande: "Crée une boîte à rythmes avec 8 gros boutons de sons différents fabriqués avec la Web Audio API, et un mode enregistrement",
+    astuce: "Plus tu donnes de détails techniques, plus le résultat colle à ton idée." },
+  { id: "libre", niveau: 3, emoji: "💡", titre: "Mon idée à moi", mode: "creer", demande: "",
+    astuce: "Commence simple, teste, puis améliore. C'est exactement comme ça que travaillent les pros." },
+];
+const NIVEAUX = { 1: "Niveau 1 · Premiers pas", 2: "Niveau 2 · Améliorer et comprendre", 3: "Niveau 3 · Inventer" };
+
+let projets = lireStockage("atelier_projets", []);           // [{ id, titre, code, journal, date }]
+let missionsFaites = lireStockage("atelier_missions", []);   // ids des missions réussies
+let projetCourant = null;                                    // id du projet ouvert (null = écran des idées)
+let missionEnCours = null;                                   // mission lancée, validée au premier résultat
+let voirCode = false;                                        // affiche l'éditeur de code sous l'aperçu
+// Carnet d'apprentie : les astuces IA récoltées + le nombre de défis de code réussis (= son niveau).
+let carnet = lireStockage("atelier_carnet", { astuces: [], defis: 0 });
+function sauverCarnet() { ecrireStockage("atelier_carnet", carnet); }
+
+const projetOuvert = () => projets.find((p) => p.id === projetCourant);
+function sauverProjets() {
+  // On garde les 30 projets les plus récents (le stockage du téléphone est limité).
+  projets = projets.sort((a, b) => b.date - a.date).slice(0, 30);
+  ecrireStockage("atelier_projets", projets);
+}
+function validerMission(id) {
+  if (id && !missionsFaites.includes(id)) { missionsFaites.push(id); ecrireStockage("atelier_missions", missionsFaites); }
+}
+
+// --- Affichage : écran des idées OU projet ouvert ---
+function afficherCreer() {
+  const p = projetOuvert();
+  $("texte").placeholder = p ? "Demande une amélioration…" : "Décris ce que tu veux créer…";
+  if (p) return afficherProjet(p);
+
+  const pct = Math.round((missionsFaites.length / MISSIONS.length) * 100);
+  let html = `
+    <div class="carte">
+      <h2>🚀 Qu'est-ce que tu veux créer ?</h2>
+      <div class="mini" style="color:var(--doux)">Décris ton idée en bas, ou lance une mission. Chaque mission t'apprend une astuce pour mieux utiliser l'IA.</div>
+      <div class="mini" style="margin-top:8px"><b>Missions réussies : ${missionsFaites.length} / ${MISSIONS.length}</b>${pct === 100 ? " 🏆 Experte de l'IA !" : ""}</div>
+      <div class="progression"><div style="width:${pct}%"></div></div>
+    </div>`;
+
+  for (const n of [1, 2, 3]) {
+    html += `<div class="titre-section">${NIVEAUX[n]}</div><div class="grille">`;
+    html += MISSIONS.filter((m) => m.niveau === n).map((m) => `
+      <button class="mission ${missionsFaites.includes(m.id) ? "faite" : ""}" onclick="lancerMission('${m.id}')">
+        <span class="emoji">${m.emoji}</span><b>${m.titre}</b><small>${m.astuce}</small>
+      </button>`).join("");
+    html += `</div>`;
+  }
+
+  // Le carnet : ce qu'elle a appris, pour s'en souvenir.
+  html += `
+    <details class="carte">
+      <summary>📒 Mon carnet d'IA · ${carnet.defis} défi${carnet.defis > 1 ? "s" : ""} de code réussi${carnet.defis > 1 ? "s" : ""}</summary>
+      ${carnet.astuces.length
+        ? "<ul class='mini' style='margin-top:8px'>" + carnet.astuces.map((a) => "<li>" + echapper(a) + "</li>").join("") + "</ul>"
+        : "<div class='mini' style='color:var(--doux);margin-top:8px'>Tes astuces apparaîtront ici au fil de tes créations.</div>"}
+    </details>`;
+
+  if (projets.length) {
+    html += `<div class="titre-section">📁 Mes créations</div>`;
+    html += projets.map((pr) => `
+      <div class="projet-ligne">
+        <span onclick="ouvrirProjet(${pr.id})">🧩 ${echapper(pr.titre)}</span>
+        <button class="btn-icone" onclick="supprimerProjet(${pr.id}, this)">🗑</button>
+      </div>`).join("");
+  }
+  $("zone").innerHTML = html;
+}
+
+function afficherProjet(p) {
+  // L'aperçu est un <iframe sandbox="allow-scripts"> : le code créé peut s'exécuter,
+  // mais il est enfermé. Il ne peut pas lire le mot de passe ni les données de l'appli.
+  let html = `
+    <div class="barre-projet">
+      <button class="btn-icone" onclick="nouvelleConversation()">← Idées</button>
+      <b>🧩 ${echapper(p.titre)}</b>
+      <button class="btn-icone" onclick="basculerCode()">${voirCode ? "🙈" : "✏️"} Code</button>
+      <button class="btn-icone" onclick="pleinEcran(true)">⛶</button>
+    </div>
+    <iframe id="apercu-projet" class="apercu-projet" sandbox="allow-scripts" title="Aperçu"></iframe>`;
+  // Le défi du moment : c'est ELLE qui code.
+  if (p.defi) html += `
+    <div class="defi ${p.defiReussi ? "reussi" : ""}">
+      <b>${p.defiReussi ? "✅ Défi réussi !" : "🎯 À toi de jouer"}</b><br>${echapper(p.defi)}
+      ${p.defiReussi ? "" : `<div class="ligne-btn"><button class="btn-icone" onclick="ouvrirEditeur()">✏️ Ouvrir le code</button></div>`}
+    </div>`;
+  // L'éditeur : elle modifie, teste, et peut faire relire son code par le coach.
+  if (voirCode) html += `
+    <textarea id="editeur" class="editeur" spellcheck="false" autocapitalize="off" autocorrect="off">${echapper(p.code)}</textarea>
+    <div class="ligne-btn">
+      <button class="btn-icone" onclick="testerCode()">▶ Tester</button>
+      <button class="btn-icone" onclick="verifierCode()">🧐 Vérifie mon code</button>
+      <button class="btn-icone" onclick="annulerCode()">↩ Version IA</button>
+    </div>`;
+  // Le journal : ses demandes + les explications et astuces de Claude (du plus récent au plus ancien).
+  // On regroupe par paires (demande + réponse) et on inverse les paires : la demande reste au-dessus de sa réponse.
+  const paires = [];
+  for (let i = 0; i < p.journal.length; i += 2) paires.push(p.journal.slice(i, i + 2));
+  html += paires.reverse().flat().map((j) => j.role === "user"
+    ? `<div class="bulle moi mini">${echapper(j.texte)}</div>`
+    : `<div class="bulle elle mini">${miseEnForme(j.texte)}</div>`).join("");
+  $("zone").innerHTML = html;
+  $("apercu-projet").srcdoc = p.code;   // srcdoc = on donne le HTML directement au cadre
+  $("zone").scrollTop = 0;
+}
+
+function lancerMission(id) {
+  const m = MISSIONS.find((x) => x.id === id);
+  missionEnCours = m.id;
+  if (m.mode !== "creer") {                // missions qui se font dans un autre onglet
+    changerMode(m.mode);
+    validerMission(m.id);                  // lancée = réussie (le but est de tester)
+  } else {
+    projetCourant = null; afficherCreer();
+  }
+  $("texte").value = m.demande; ajusterHauteur(); $("texte").focus();
+  if (m.photo) document.getElementById("fichier").click();
+}
+
+function ouvrirProjet(id) { projetCourant = id; voirCode = false; afficherCreer(); }
+function supprimerProjet(id, bouton) {
+  // Double appui pour confirmer (pas de boîte de dialogue bloquante).
+  if (bouton.dataset.ok !== "1") { bouton.dataset.ok = "1"; bouton.textContent = "Sûre ?"; return; }
+  projets = projets.filter((p) => p.id !== id); sauverProjets(); afficherCreer();
+}
+function basculerCode() { voirCode = !voirCode; afficherCreer(); }
+function pleinEcran(oui) {
+  $("apercu-projet")?.classList.toggle("plein", oui);
+  $("fermer-plein").style.display = oui ? "block" : "none";
+}
+
+// --- v1.2.0 : c'est elle qui code ---
+function ouvrirEditeur() { voirCode = true; afficherCreer(); $("editeur")?.focus(); }
+
+// ▶ Tester : on enregistre son code et on relance l'aperçu.
+function testerCode() {
+  const p = projetOuvert();
+  p.code = $("editeur").value; p.date = Date.now(); sauverProjets();
+  $("apercu-projet").srcdoc = p.code;
+  $("zone").scrollTop = 0;              // on remonte voir le résultat
+}
+
+// ↩ Version IA : en cas de casse, on revient à la dernière version écrite par l'IA (double appui).
+let dernierAnnuler = 0;
+function annulerCode() {
+  const p = projetOuvert();
+  if (Date.now() - dernierAnnuler > 2500) { dernierAnnuler = Date.now(); alerteDouce("Appuie encore une fois pour revenir à la version de l'IA."); return; }
+  p.code = p.codeIA || p.code; sauverProjets(); afficherCreer();
+}
+
+// 🧐 Vérifie mon code : le coach relit SA modification et donne un indice, pas la solution.
+async function verifierCode() {
+  if (enCours) return;
+  const p = projetOuvert();
+  p.code = $("editeur").value; sauverProjets();
+  if (p.code === p.codeIA) { alerteDouce("Tu n'as encore rien changé dans le code. Lance-toi, tu ne peux rien casser : il y a « ↩ Version IA » !"); return; }
+  const message = "Mon défi : " + (p.defi || "améliorer le projet moi-même") + "\n\n"
+    + "Code d'avant (écrit par l'IA) :\n```html\n" + (p.codeIA || "") + "\n```\n\n"
+    + "Mon code modifié :\n```html\n" + p.code + "\n```";
+  attente(true);
+  const d = $("zone").querySelector(".attente"); if (d) { d.textContent = "Le coach relit ton code… 🧐"; $("zone").prepend(d); $("zone").scrollTop = 0; }
+  try {
+    const retour = await appelerClaude("coach", [{ role: "user", content: message }]);
+    const reussi = /^\s*RÉUSSI/i.test(retour);
+    const texte = retour.replace(/^\s*(RÉUSSI|PAS ENCORE)\s*/i, "");
+    p.journal.push({ role: "user", texte: "🧐 Vérifie mon code" },
+                   { role: "assistant", texte: (reussi ? "✅ **Défi réussi !**\n\n" : "🔎 **Presque !**\n\n") + texte });
+    if (reussi && !p.defiReussi) { p.defiReussi = true; carnet.defis++; sauverCarnet(); }
+    if (reussi) p.codeIA = p.code;      // sa version devient la nouvelle référence
+    sauverProjets();
+  } catch (err) { attente(false); alerteDouce(err.message); return; }
+  attente(false);
+  voirCode = false; afficherCreer();
+}
+
+// --- Envoi d'une demande de création ou d'amélioration ---
+async function envoyerCreation() {
+  if (enCours) return;
+  const texte = $("texte").value.trim();
+  if (!texte && !photoEnAttente) return;
+
+  let p = projetOuvert();
+  const nouveau = !p;
+  if (nouveau) p = { id: Date.now(), titre: texte.slice(0, 40) || "Mon projet", code: "", journal: [], date: Date.now() };
+
+  // Pour économiser le crédit, on n'envoie PAS toute la conversation :
+  // seulement le code actuel, ses 3 dernières demandes (pour le contexte) et la nouvelle.
+  let consigne;
+  if (nouveau) {
+    consigne = "Nouveau projet. Ma demande : " + (texte || "Inspire-toi de ma photo.");
+  } else {
+    const avant = p.journal.filter((j) => j.role === "user").slice(-3).map((j) => "- " + j.texte).join("\n");
+    consigne = "Voici le code actuel de mon projet :\n```html\n" + p.code + "\n```\n\n"
+             + "Mes demandes précédentes :\n" + avant + "\n\nMa nouvelle demande : " + (texte || "Inspire-toi de ma photo.");
+  }
+  // Son niveau (nombre de défis réussis) permet à l'IA d'adapter la difficulté du prochain défi.
+  consigne += "\n\n(Mon niveau : " + carnet.defis + " défis de code réussis)";
+  const contenu = [];
+  if (photoEnAttente) contenu.push({ type: "image", source: { type: "base64", media_type: photoEnAttente.media_type, data: photoEnAttente.data } });
+  contenu.push({ type: "text", text: consigne });
+
+  $("texte").value = ""; ajusterHauteur(); retirerPhoto();
+  $("zone").insertAdjacentHTML("afterbegin", `<div class="bulle moi mini">${echapper(texte || "📷 Photo")}</div>`);
+  attente(true);
+  const deroule = $("zone").querySelector(".attente");
+  if (deroule) { deroule.textContent = "Je code ton idée… (ça peut prendre 30 secondes) 🛠️"; $("zone").prepend(deroule); $("zone").scrollTop = 0; }
+
+  try {
+    const reponse = await appelerClaude("creer", [{ role: "user", content: contenu }]);
+    const { titre, explication, code, defi, astuce } = decouperReponse(reponse);
+    if (!code) throw new Error("Je n'ai pas réussi à fabriquer le code. Réessaie en reformulant ?");
+    p.code = code;
+    p.codeIA = code;                    // la version de l'IA, pour « ↩ Version IA » et pour le coach
+    p.defi = defi; p.defiReussi = false;
+    if (astuce && !carnet.astuces.includes(astuce)) { carnet.astuces.unshift(astuce); carnet.astuces = carnet.astuces.slice(0, 60); sauverCarnet(); }
+    if (titre && nouveau) p.titre = titre;
+    p.journal.push({ role: "user", texte: texte || "📷 Photo" }, { role: "assistant", texte: explication });
+    p.date = Date.now();
+    if (nouveau) projets.push(p);
+    sauverProjets();
+    projetCourant = p.id; voirCode = false;
+    validerMission(missionEnCours); missionEnCours = null;
+  } catch (err) {
+    $("texte").value = texte;
+    attente(false);
+    alerteDouce(err.message);
+    return;
+  }
+  attente(false);
+  if (mode === "creer") afficherCreer();
+}
+
+// Sépare la réponse de Claude : « TITRE: … », l'explication et le bloc ```html```.
+function decouperReponse(rep) {
+  let code = "";
+  const blocs = [...rep.matchAll(/```html\s*([\s\S]*?)(```|$)/gi)];
+  if (blocs.length) code = blocs[blocs.length - 1][1].trim();
+  else if (/<html|<!doctype/i.test(rep)) code = rep.slice(rep.search(/<!doctype|<html/i)).trim();
+
+  let texte = rep.replace(/```html[\s\S]*?(```|$)/gi, "").trim();
+  const t = texte.match(/^TITRE\s*:\s*(.+)$/im);
+  if (t) texte = texte.replace(t[0], "").trim();
+  // Réponse coupée (trop longue) : on prévient au lieu d'afficher un code cassé en silence.
+  if (blocs.length && blocs[blocs.length - 1][2] !== "```")
+    texte += "\n\n⚠️ Le code était très long et a peut-être été coupé. Si ça ne marche pas, demande une version plus simple.";
+  // Le défi s'affiche à part (encadré jaune), on le retire de l'explication.
+  const d = texte.match(/^.*À toi de jouer\s*:\s*([\s\S]+?)(?:\n\s*\n|$)/im);
+  if (d) texte = texte.replace(d[0], "").trim();
+  const a = texte.match(/Astuce IA\s*:\s*(.+)/i);
+  return { titre: t ? t[1].trim().slice(0, 40) : "", explication: texte, code,
+           defi: d ? d[1].trim() : "", astuce: a ? a[1].trim() : "" };
+}
+
+// ---------------------------------------------------------------------
+//  Navigation entre les onglets
+// ---------------------------------------------------------------------
+function changerMode(nouveau) {
+  mode = nouveau;
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("actif", b.dataset.mode === mode));
+  $("titre").textContent = MODES[mode].titre;
+  retirerPhoto();
+  const quiz = mode === "quiz";
+  $("saisie").classList.toggle("cache", quiz);
+  $("texte").placeholder = mode === "creer" ? "Décris ce que tu veux créer…" : "Écris ton message…";
+  if (quiz) afficherQuiz(); else if (mode === "creer") afficherCreer(); else afficherChat();
+  ecrireStockage("atelier_mode", mode);
+}
+document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => changerMode(b.dataset.mode)));
+
+// La zone de texte grandit avec le message ; « Entrée » = nouvelle ligne (plus pratique sur téléphone).
+function ajusterHauteur() { const t = $("texte"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 120) + "px"; }
+$("texte").addEventListener("input", ajusterHauteur);
+
+// ---------------------------------------------------------------------
+//  Démarrage
+// ---------------------------------------------------------------------
+$("version").textContent = "v" + VERSION;
+for (const m of Object.keys(MODES)) historiques[m] = lireStockage("atelier_" + m, []);
+if (!motDePasse()) $("ecran-mdp").style.display = "flex";
+changerMode(lireStockage("atelier_mode", "devoirs"));
+
+// Service worker : permet d'installer l'appli sur l'écran d'accueil.
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>
