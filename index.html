@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Nanon Claude IA</title>
-<meta name="theme-color" content="#0f766e">
+<meta name="theme-color" content="#000000">
+<!-- Police « terminal » (si elle ne charge pas, on retombe sur la police monospace du téléphone) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -150,11 +153,107 @@
   .actions { display:flex; gap:4px; margin-top:6px; }
   .actions button { border:none; background:var(--accent-clair); color:var(--accent); border-radius:8px; padding:3px 8px; font-size:13px; cursor:pointer; }
   #btn-envoyer.stop { background:var(--ko); }
+
+  /* =====================================================================
+     v1.4.0 : THÈME MATRIX
+     Placé à la fin : ces règles passent devant les précédentes (même priorité,
+     mais écrites après). Pour revenir à l'ancien look, il suffit de supprimer ce bloc.
+     ===================================================================== */
+  :root {
+    --fond:#000; --carte:rgba(0,14,4,.88); --texte:#c6ffd2; --doux:#3fae5c;
+    --accent:#00ff41; --accent-clair:rgba(0,255,65,.10); --bulle-moi:rgba(0,255,65,.12);
+    --bord:#0f4a22; --ok:#00ff41; --ko:#ff3b5c;
+    --lueur:0 0 6px rgba(0,255,65,.65), 0 0 14px rgba(0,255,65,.25);   /* effet néon */
+    color-scheme: dark;
+  }
+  html, body { font-family:"Share Tech Mono", ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing:.2px; }
+  body { background:#000; }
+  /* La pluie de caractères est dessinée dans ce canvas, derrière tout le reste */
+  #pluie { position:fixed; inset:0; width:100%; height:100%; z-index:-1; opacity:.22; pointer-events:none; }
+  header, .saisie, nav, .apercu { background:rgba(0,8,2,.92); backdrop-filter:blur(3px); }
+  header { border-bottom:1px solid var(--bord); box-shadow:0 1px 12px rgba(0,255,65,.12); }
+  nav, .saisie { border-top:1px solid var(--bord); }
+  header h1 { color:var(--accent); text-shadow:var(--lueur); text-transform:uppercase; letter-spacing:1.5px; font-size:17px; }
+  header small { color:var(--doux); }
+  main { background:transparent; }
+
+  /* Boutons : contour vert, fond noir ; les boutons principaux sont pleins */
+  .btn-icone { background:transparent; border:1px solid var(--bord); color:var(--accent); }
+  .btn-icone:active, .gros-btn:active, .saisie button:active { box-shadow:var(--lueur); }
+  .gros-btn, .saisie button, #btn-envoyer { background:var(--accent); color:#001a07; font-weight:700; box-shadow:0 0 10px rgba(0,255,65,.35); }
+  .gros-btn.secondaire, .saisie button.secondaire { background:transparent; color:var(--accent); border:1px solid var(--accent); box-shadow:none; }
+  #btn-envoyer.stop { background:var(--ko); color:#fff; box-shadow:0 0 10px rgba(255,59,92,.5); }
+
+  /* Bulles façon terminal */
+  .bulle { border-radius:6px; }
+  .bulle.moi { background:var(--bulle-moi); color:var(--texte); border:1px solid rgba(0,255,65,.45); border-bottom-right-radius:2px; }
+  .bulle.moi p:first-child::before { content:"> "; color:var(--accent); }
+  .bulle.elle { background:var(--carte); border:1px solid var(--bord); border-left:3px solid var(--accent); }
+  .bulle.elle b { color:var(--accent); }
+  .curseur::after { content:"▌"; color:var(--accent); animation:clignote 1s steps(1) infinite; margin-left:2px; }
+  @keyframes clignote { 50% { opacity:0; } }
+  .attente { color:var(--accent); font-style:normal; }
+  .attente::after { content:"▌"; animation:clignote 1s steps(1) infinite; }
+
+  /* Écran d'accueil d'un onglet : texte qui « tape » */
+  .accueil b { color:var(--accent); text-shadow:var(--lueur); font-size:22px; }
+  .accueil b::after { content:"_"; animation:clignote 1s steps(1) infinite; }
+
+  /* Saisie */
+  .saisie textarea, #recherche, #ecran-mdp input, .zone-quiz textarea {
+    background:#000; color:var(--accent); border:1px solid var(--bord); caret-color:var(--accent); font-family:inherit; }
+  .saisie textarea:focus, #recherche:focus, #ecran-mdp input:focus, .zone-quiz textarea:focus { outline:none; border-color:var(--accent); box-shadow:var(--lueur); }
+  ::placeholder { color:#2f7a45; }
+
+  /* Onglets du bas */
+  nav button { color:#2f8a4a; font-family:inherit; }
+  nav button.actif { color:var(--accent); text-shadow:var(--lueur); }
+
+  /* Cartes, quiz, créer */
+  .carte, .mission, .projet-ligne { background:var(--carte); border-color:var(--bord); border-radius:8px; }
+  .carte h2, .titre-section { color:var(--accent); text-shadow:var(--lueur); }
+  .mission.faite { border-color:var(--accent); box-shadow:inset 0 0 12px rgba(0,255,65,.15); }
+  .choix { background:#000; border-color:var(--bord); color:var(--texte); font-family:inherit; border-radius:6px; }
+  .choix.bon { background:rgba(0,255,65,.15); border-color:var(--accent); color:var(--accent); }
+  .choix.faux { background:rgba(255,59,92,.12); border-color:var(--ko); color:#ffb3c0; }
+  .progression { background:#03200c; }
+  .progression div { background:var(--accent); box-shadow:var(--lueur); }
+  .defi { background:rgba(255,214,0,.07); color:#ffe680; border-color:#6b5a00; }
+  .defi.reussi { background:rgba(0,255,65,.10); color:var(--accent); border-color:var(--accent); }
+  .astuce { background:var(--accent-clair); }
+  .apercu-projet { border-color:var(--accent); box-shadow:var(--lueur); }
+
+  /* Code */
+  .code pre, .editeur { background:#000; color:var(--accent); border:1px solid var(--bord); }
+  .code button { background:var(--accent); color:#001a07; }
+
+  /* Tiroir et actions */
+  #tiroir { background:#000; border-right:1px solid var(--accent); box-shadow:4px 0 24px rgba(0,255,65,.18); }
+  .conv.active { background:var(--accent-clair); box-shadow:inset 3px 0 0 var(--accent); }
+  .actions button { background:transparent; border:1px solid var(--bord); color:var(--accent); }
+  #voile { background:rgba(0,0,0,.6); }
+
+  /* Écran du mot de passe : « accès sécurisé » */
+  #ecran-mdp { background:rgba(0,0,0,.97); }
+  #ecran-mdp h2 { color:var(--accent); text-shadow:var(--lueur); letter-spacing:2px; text-transform:uppercase; }
+  #ecran-mdp h2::before { content:"// "; color:var(--doux); }
+
+  /* Barre de défilement fine et verte */
+  * { scrollbar-width:thin; scrollbar-color:#0f4a22 transparent; }
+
+  /* Si le téléphone demande moins d'animations : pas de pluie ni de clignotement */
+  @media (prefers-reduced-motion: reduce) {
+    #pluie { display:none; }
+    .curseur::after, .attente::after, .accueil b::after { animation:none; }
+  }
 </style>
 </head>
 <body>
 
 <!-- Écran du mot de passe (affiché seulement la première fois) -->
+<!-- v1.4.0 : pluie de caractères façon Matrix, en fond -->
+<canvas id="pluie" aria-hidden="true"></canvas>
+
 <div id="ecran-mdp">
   <img src="icon-192.png" alt="" width="72" height="72" style="border-radius:18px">
   <h2 style="margin:0">Nanon Claude IA</h2>
@@ -222,7 +321,7 @@
 // =====================================================================
 //  Nanon Claude IA — page web   (le numéro de version est ici)
 // =====================================================================
-const VERSION = "1.3.1"; // 1.3.0 : nom, historique, direct, 🔊, réglages ; 1.3.1 : écran mot de passe (taille, message d'erreur, 👁)
+const VERSION = "1.4.0"; // 1.3.x : historique, direct, 🔊, réglages, mot de passe ; 1.4.0 : thème Matrix
 
 // Adresse du relais Cloudflare (le Worker qui garde la clé API).
 const RELAIS = "https://atelier-nanon.sebastien-vaug.workers.dev";
@@ -516,7 +615,7 @@ function afficherChat() {
   const zone = $("zone");
   const hist = historiques[mode];
   if (!hist.length) {
-    zone.innerHTML = `<div class="accueil"><b>Salut Nanon 👋</b>${MODES[mode].accueil}</div>`;
+    zone.innerHTML = `<div class="accueil"><b>Réveille-toi, Nanon…</b>${MODES[mode].accueil}</div>`;
     return;
   }
   zone.innerHTML = hist.map((m, i) => {
@@ -564,6 +663,7 @@ async function envoyer() {
       if (fini) return;                 // la réponse est terminée : l'affichage final a pris le relais
       if (!bulle) { attente(false, true); bulle = document.createElement("div"); bulle.className = "bulle elle"; $("zone").appendChild(bulle); }
       bulle.innerHTML = miseEnForme(partiel);
+      bulle.lastElementChild?.classList.add("curseur");   // curseur ▌ qui clignote à la fin du texte
       $("zone").scrollTop = $("zone").scrollHeight;
     });
   };
@@ -954,7 +1054,7 @@ function validerMission(id) {
 // --- Affichage : écran des idées OU projet ouvert ---
 function afficherCreer() {
   const p = projetOuvert();
-  $("texte").placeholder = p ? "Demande une amélioration…" : "Décris ce que tu veux créer…";
+  $("texte").placeholder = p ? "Une amélioration ?" : "Ton idée…";
   if (p) return afficherProjet(p);
 
   const pct = Math.round((missionsFaites.length / MISSIONS.length) * 100);
@@ -1189,7 +1289,7 @@ function changerMode(nouveau) {
   retirerPhoto();
   const quiz = mode === "quiz";
   $("saisie").classList.toggle("cache", quiz);
-  $("texte").placeholder = mode === "creer" ? "Décris ce que tu veux créer…" : "Écris ton message…";
+  $("texte").placeholder = mode === "creer" ? "Ton idée…" : "Écris ton message…";
   if (quiz) afficherQuiz(); else if (mode === "creer") afficherCreer(); else afficherChat();
   ecrireStockage("atelier_mode", mode);
 }
@@ -1222,6 +1322,38 @@ for (const m of Object.keys(MODES)) {
 }
 if (!motDePasse()) $("ecran-mdp").style.display = "flex";
 changerMode(lireStockage("atelier_mode", "devoirs"));
+
+// =====================================================================
+//  v1.4.0 : pluie de caractères façon Matrix
+//  Chaque colonne a une « goutte » qui descend ; on repeint l'écran en noir
+//  très transparent à chaque image, ce qui laisse une traînée qui s'efface.
+// =====================================================================
+(function pluieMatrix() {
+  const canvas = $("pluie");
+  if (!canvas || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const ctx = canvas.getContext("2d");
+  const CARACTERES = "アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789NANONCLAUDE";
+  const TAILLE = 16;                       // taille d'un caractère, en pixels
+  let gouttes = [];
+  function redimensionner() {
+    canvas.width = innerWidth; canvas.height = innerHeight;
+    gouttes = Array.from({ length: Math.ceil(innerWidth / TAILLE) }, () => Math.random() * -50);
+  }
+  redimensionner();
+  addEventListener("resize", redimensionner);
+  setInterval(() => {
+    if (document.hidden) return;           // onglet caché : on ne dessine rien (économie de batterie)
+    ctx.fillStyle = "rgba(0,0,0,0.08)";    // voile noir = traînée qui s'efface
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#00ff41";
+    ctx.font = TAILLE + "px monospace";
+    gouttes.forEach((y, i) => {
+      ctx.fillText(CARACTERES[Math.floor(Math.random() * CARACTERES.length)], i * TAILLE, y * TAILLE);
+      // arrivée en bas : la goutte repart d'en haut, au hasard
+      gouttes[i] = y * TAILLE > canvas.height && Math.random() > 0.975 ? 0 : y + 1;
+    });
+  }, 60);                                  // ~16 images/s : assez fluide, peu gourmand
+})();
 
 // Service worker : permet d'installer l'appli sur l'écran d'accueil.
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
