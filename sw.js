@@ -1,7 +1,7 @@
-// Service worker de L'Atelier de Nanon — v1.2.0
+// Service worker de L'Atelier de Nanon — v1.2.1
 // Rôle : rendre l'appli installable et afficher la page même hors connexion.
 // Changer CACHE à chaque nouvelle version force le téléphone à tout recharger.
-const CACHE = "atelier-nanon-v1.2.0";
+const CACHE = "atelier-nanon-v1.2.1";
 const FICHIERS = ["./", "index.html", "manifest.json", "icon-192.png", "icon-512.png"];
 
 // Installation : on met les fichiers de l'appli en cache.
