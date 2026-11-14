@@ -17,7 +17,7 @@
   }
   @media (prefers-color-scheme: dark) {
     :root { --fond:#0e1716; --carte:#16211f; --texte:#e5efee; --doux:#8fa6a3;
-            --accent:#2dd4bf; --accent-clair:#123a36; --bulle-moi:#0f766e; --bord:#24332f; }
+            --accent:#2dd4bf; --accent-clair:#123a36; --bulle-moi:#0f766e; --bord:#24332f; --ko:#f87171; }
   }
   * { box-sizing: border-box; }
   html, body { margin:0; height:100%; background:var(--fond); color:var(--texte);
@@ -80,6 +80,11 @@
   /* Écran mot de passe */
   #ecran-mdp { position:fixed; inset:0; background:var(--fond); display:none; flex-direction:column;
     align-items:center; justify-content:center; gap:12px; padding:24px; z-index:10; }
+  /* v1.3.1 : le bouton ne doit pas s'étirer sur tout l'écran */
+  #ecran-mdp .gros-btn { flex:none; }
+  .ligne-mdp { display:flex; gap:8px; width:100%; max-width:300px; }
+  .ligne-mdp input { flex:1; min-width:0; }
+  #erreur-mdp { color:var(--ko); font-size:14px; text-align:center; max-width:300px; min-height:1em; }
   #ecran-mdp input { font:inherit; padding:12px; border-radius:12px; border:1px solid var(--bord); width:100%; max-width:300px;
     background:var(--carte); color:var(--texte); }
   .cache { display:none !important; }
@@ -153,7 +158,13 @@
 <div id="ecran-mdp">
   <img src="icon-192.png" alt="" width="72" height="72" style="border-radius:18px">
   <h2 style="margin:0">Nanon Claude IA</h2>
-  <input id="champ-mdp" type="password" placeholder="Mot de passe" autocomplete="current-password">
+  <div class="ligne-mdp">
+    <!-- autocapitalize/autocorrect off : le clavier ne met pas de majuscule ou de correction en douce -->
+    <input id="champ-mdp" type="password" placeholder="Mot de passe" autocomplete="current-password"
+           autocapitalize="off" autocorrect="off" spellcheck="false" onkeydown="if(event.key==='Enter')validerMdp()">
+    <button class="btn-icone" onclick="voirMdp()" title="Afficher / masquer">👁</button>
+  </div>
+  <div id="erreur-mdp"></div>
   <button class="gros-btn" style="max-width:300px;width:100%" onclick="validerMdp()">Entrer</button>
 </div>
 
@@ -211,7 +222,7 @@
 // =====================================================================
 //  Nanon Claude IA — page web   (le numéro de version est ici)
 // =====================================================================
-const VERSION = "1.3.0"; // 1.2.x : Créer, défis, coach, relais ; 1.3.0 : nouveau nom, historique, réponses en direct, 🔊, réglages
+const VERSION = "1.3.1"; // 1.3.0 : nom, historique, direct, 🔊, réglages ; 1.3.1 : écran mot de passe (taille, message d'erreur, 👁)
 
 // Adresse du relais Cloudflare (le Worker qui garde la clé API).
 const RELAIS = "https://atelier-nanon.sebastien-vaug.workers.dev";
@@ -294,12 +305,28 @@ function sauvegarder(m) {
 // ---------------------------------------------------------------------
 //  Mot de passe
 // ---------------------------------------------------------------------
-function motDePasse() { return lireStockage("atelier_mdp", ""); }
+// Le mot de passe est gardé dans le téléphone ET en mémoire : si le navigateur bloque
+// le stockage (navigation privée, Brave strict…), l'appli marche quand même pendant la visite.
+let mdpMemoire = "";
+function motDePasse() { return lireStockage("atelier_mdp", "") || mdpMemoire; }
 function validerMdp() {
   const v = $("champ-mdp").value.trim();
   if (!v) return;
+  mdpMemoire = v;
   ecrireStockage("atelier_mdp", v);
+  $("erreur-mdp").textContent = "";
   $("ecran-mdp").style.display = "none";
+}
+// Réaffiche l'écran du mot de passe, avec la raison.
+function demanderMdp(raison) {
+  mdpMemoire = "";
+  ecrireStockage("atelier_mdp", "");
+  $("erreur-mdp").textContent = raison || "";
+  $("ecran-mdp").style.display = "flex";
+}
+function voirMdp() {
+  const c = $("champ-mdp");
+  c.type = c.type === "password" ? "text" : "password";
 }
 
 // ---------------------------------------------------------------------
@@ -312,10 +339,7 @@ async function appelerClaude(modeAppel, messages) {
     body: JSON.stringify({ mode: modeAppel, messages }),
   });
   const donnees = await rep.json().catch(() => ({}));
-  if (rep.status === 401) {                       // mauvais mot de passe → on le redemande
-    ecrireStockage("atelier_mdp", "");
-    $("ecran-mdp").style.display = "flex";
-  }
+  if (rep.status === 401) demanderMdp("Mot de passe refusé. Vérifie les majuscules, les accents et les espaces (👁 pour l'afficher).");
   if (!rep.ok) throw new Error(donnees.erreur || "Erreur " + rep.status);
   compterTokens(donnees.usage);
   return donnees.texte;
@@ -337,7 +361,7 @@ async function appelerClaudeEnDirect(modeAppel, messages, surTexte, signal) {
   // Réponse classique (erreur, ou ancien relais qui ne sait pas streamer) : on la traite d'un bloc.
   if (!type.includes("event-stream")) {
     const donnees = await rep.json().catch(() => ({}));
-    if (rep.status === 401) { ecrireStockage("atelier_mdp", ""); $("ecran-mdp").style.display = "flex"; }
+    if (rep.status === 401) demanderMdp("Mot de passe refusé. Vérifie les majuscules, les accents et les espaces (👁 pour l'afficher).");
     if (!rep.ok) throw new Error(donnees.erreur || "Erreur " + rep.status);
     compterTokens(donnees.usage);
     surTexte(donnees.texte);
@@ -775,10 +799,9 @@ $("fichier-restaurer").addEventListener("change", async (e) => {
 });
 
 function changerMotDePasse() {
-  ecrireStockage("atelier_mdp", "");
   ouvrirTiroir(false);
   $("champ-mdp").value = "";
-  $("ecran-mdp").style.display = "flex";
+  demanderMdp("");
 }
 
 // ---------------------------------------------------------------------

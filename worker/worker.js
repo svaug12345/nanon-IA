@@ -17,7 +17,7 @@
 //   - APP_PASSWORD      : le mot de passe que tu donnes à Nanon (« Secret »)
 // =====================================================================
 
-const VERSION = "1.3.0"; // 1.1.0 : « créer » ; 1.2.0 : défis + « coach » ; 1.3.0 : réponses en direct (streaming)
+const VERSION = "1.3.1"; // 1.2.0 : défis + coach ; 1.3.0 : streaming ; 1.3.1 : messages clairs si mot de passe absent/faux
 
 // Modes qui peuvent répondre « en direct » (mot à mot). Les autres (quiz, créer, coach)
 // ont besoin de la réponse complète pour être découpée, donc pas de streaming.
@@ -205,7 +205,13 @@ export default {
     if (!ORIGINES_AUTORISEES.includes(origine)) return json({ erreur: "Origine non autorisée" }, 403, cors);
 
     // 2. Mot de passe de l'appli
-    if (!env.APP_PASSWORD || request.headers.get("X-App-Password") !== env.APP_PASSWORD)
+    //    D'abord : est-il bien configuré dans Cloudflare ? (sinon, message clair au lieu d'un refus en boucle)
+    if (!env.APP_PASSWORD)
+      return json({ erreur: "Configuration : le secret APP_PASSWORD n'existe pas dans Cloudflare." }, 500, cors);
+    if (!env.ANTHROPIC_API_KEY)
+      return json({ erreur: "Configuration : le secret ANTHROPIC_API_KEY n'existe pas dans Cloudflare." }, 500, cors);
+    //    Puis on compare (en ignorant les espaces en trop au début et à la fin).
+    if ((request.headers.get("X-App-Password") || "").trim() !== env.APP_PASSWORD.trim())
       return json({ erreur: "Mot de passe incorrect" }, 401, cors);
 
     // Taille maximale de la requête (~10 Mo, une photo compressée fait ~300 Ko)
